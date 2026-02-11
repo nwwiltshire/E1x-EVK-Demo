@@ -6,7 +6,7 @@ import pandas as pd
 import numpy as np
 import datetime
 
-# --- Configuration & Constants ---
+# Config
 REFRESH_RATE = 0.1 # Seconds
 
 def get_serial_ports():
@@ -25,8 +25,6 @@ def read_serial_data(ser):
         if ser.in_waiting:
             line = ser.readline().decode('utf-8').strip()
             parts = line.split(',')
-            # Expecting CSV format: timestamp(optional), curr, volt, pwr
-            # Adjust indices based on your actual device output
             if len(parts) >= 3:
                 try:
                     return {
@@ -41,19 +39,18 @@ def read_serial_data(ser):
         return None
     return None
 
-# --- Main App ---
+# Main App
 
 st.set_page_config(page_title="E1x Power Monitor", layout="wide")
 st.title("E1x Processor Power Dashboard")
 
-# Initialize Session State
-# storage changed to list to keep ALL history for CSV export
+# Init Session
 if 'data' not in st.session_state:
     st.session_state.data = [] 
 if 'monitoring' not in st.session_state:
     st.session_state.monitoring = False
 
-# --- Sidebar ---
+# Sidebar
 with st.sidebar:
     st.header("Settings")
     use_simulation = st.checkbox("Use Simulation Mode", value=True)
@@ -91,9 +88,9 @@ with st.sidebar:
             mime='text/csv',
         )
 
-# --- Dashboard Layout ---
+# Dashboard Layout
 
-# Metrics Row (Optional but helpful)
+# Metrics
 m1, m2, m3 = st.columns(3)
 with m1:
     metric_p = st.empty()
@@ -104,7 +101,7 @@ with m3:
 
 chart_placeholder = st.empty()
 
-# --- Main Loop ---
+# Main Loop
 
 if st.session_state.monitoring:
     ser = None
@@ -118,25 +115,25 @@ if st.session_state.monitoring:
             st.stop()
 
     while st.session_state.monitoring:
-        # 1. Fetch Data
+        # Fetch Data
         new_reading = None
         if use_simulation:
             new_reading = generate_mock_data()
             time.sleep(REFRESH_RATE)
         elif ser:
             new_reading = read_serial_data(ser)
-            # Add small sleep if serial read didn't block, to prevent CPU spin
+            # Add small sleep if serial read didn't block
             if not new_reading:
                 time.sleep(0.05)
         
-        # 2. Process & Update Chart
+        # Process & Update Chart
         if new_reading:
             st.session_state.data.append(new_reading)
             
             # Create DataFrame
             df = pd.DataFrame(st.session_state.data)
             
-            # Set timestamp as index for proper x-axis formatting
+            # Set timestamp as index (x-axis)
             df['Timestamp'] = pd.to_datetime(df['Timestamp'])
             df_chart = df.set_index('Timestamp')
 
@@ -168,14 +165,12 @@ if st.session_state.monitoring:
         ser.close()
 
 else:
-    # --- Static View (When stopped) ---
+    # Static View (Stopped State)
     if len(st.session_state.data) > 0:
         df = pd.DataFrame(st.session_state.data)
         df['Timestamp'] = pd.to_datetime(df['Timestamp'])
         df_chart = df.set_index('Timestamp')
 
-        # Logic: If stopped, user likely wants to see everything, 
-        # unless the toggle is explicitly forcing a window (unlikely use case, but consistent)
         if not show_full_history:
              # Show last 10 seconds of THE DATA (not current time)
             last_timestamp = df_chart.index.max()
